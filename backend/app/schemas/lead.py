@@ -16,6 +16,7 @@ class LeadRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    tenant_id: uuid.UUID
     company_id: uuid.UUID | None
     contact_id: uuid.UUID | None
     score: int | None

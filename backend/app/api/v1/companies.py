@@ -1,11 +1,13 @@
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_current_active_user
 from app.db.session import get_db
 from app.models.company import Company
+from app.models.user import User
 from app.schemas.company import CompanyCreate, CompanyRead
 
 router = APIRouter()
@@ -16,8 +18,14 @@ async def list_companies(
     skip: int = 0,
     limit: int = 50,
     db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_active_user),
 ) -> list[Company]:
-    result = await db.execute(select(Company).offset(skip).limit(limit))
+    result = await db.execute(
+        select(Company)
+        .where(Company.tenant_id == user.tenant_id)
+        .offset(skip)
+        .limit(limit)
+    )
     return list(result.scalars().all())
 
 
@@ -25,8 +33,9 @@ async def list_companies(
 async def create_company(
     payload: CompanyCreate,
     db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_active_user),
 ) -> Company:
-    company = Company(**payload.model_dump())
+    company = Company(**payload.model_dump(), tenant_id=user.tenant_id)
     db.add(company)
     await db.flush()
     await db.refresh(company)
@@ -37,10 +46,15 @@ async def create_company(
 async def get_company(
     company_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_active_user),
 ) -> Company:
-    result = await db.execute(select(Company).where(Company.id == company_id))
+    result = await db.execute(
+        select(Company).where(
+            Company.id == company_id,
+            Company.tenant_id == user.tenant_id,
+        )
+    )
     company = result.scalar_one_or_none()
     if not company:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Company not found")
     return company

@@ -7,7 +7,16 @@ from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app.db.base import Base
-from app.models import Company, Contact, Evidence, Lead  # noqa: F401
+from app.models import (  # noqa: F401
+    Company,
+    Contact,
+    Evidence,
+    Lead,
+    Tenant,
+    User,
+    Workspace,
+    WorkspaceMember,
+)
 
 config = context.config
 

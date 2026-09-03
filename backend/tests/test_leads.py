@@ -1,15 +1,15 @@
 import pytest
-from httpx import AsyncClient
 
 
 @pytest.mark.asyncio
-async def test_create_lead(client: AsyncClient):
+async def test_create_lead(auth_client):
+    client, headers = auth_client
     payload = {
         "score": 75,
         "status": "new",
         "qualification_reason": "High intent signal detected",
     }
-    response = await client.post("/api/v1/leads", json=payload)
+    response = await client.post("/api/v1/leads", json=payload, headers=headers)
     assert response.status_code == 201
     data = response.json()
     assert data["score"] == 75
@@ -18,7 +18,8 @@ async def test_create_lead(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_list_leads(client: AsyncClient):
-    response = await client.get("/api/v1/leads")
+async def test_list_leads(auth_client):
+    client, headers = auth_client
+    response = await client.get("/api/v1/leads", headers=headers)
     assert response.status_code == 200
     assert isinstance(response.json(), list)
