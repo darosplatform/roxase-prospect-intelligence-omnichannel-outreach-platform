@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     jwt_access_token_expire_minutes: int = 15
     jwt_refresh_token_expire_days: int = 7
 
+    # Global outreach kill switch. Independent from any provider/DAROS.
+    # When False, real sends are blocked; dry-run simulation is still allowed.
+    outreach_enabled: bool = True
+
     model_config = {
         "env_prefix": "",
         "env_file": ".env",

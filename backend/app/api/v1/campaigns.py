@@ -12,6 +12,7 @@ from app.db.session import get_db
 from app.models.campaign import Campaign
 from app.models.user import User
 from app.schemas.campaign import CampaignCreate, CampaignRead, CampaignUpdate
+from app.services.campaign_states import can_transition
 
 router = APIRouter()
 
@@ -100,6 +101,12 @@ async def update_campaign(
     campaign = await _get_owned_campaign(db, campaign_id, user.tenant_id)
     updates = payload.model_dump(exclude_unset=True)
     old_status = campaign.status
+    if "status" in updates and updates["status"] != old_status:
+        if not can_transition(old_status, updates["status"]):
+            raise HTTPException(
+                status_code=409,
+                detail=f"Invalid campaign transition: {old_status} -> {updates['status']}",
+            )
     for field, value in updates.items():
         setattr(campaign, field, value)
     if "status" in updates and updates["status"] != old_status:
@@ -107,7 +114,7 @@ async def update_campaign(
             db,
             tenant_id=user.tenant_id,
             actor_user_id=user.id,
-            action="campaign.status_changed",
+            action=f"campaign.{updates['status']}",
             entity_type="campaign",
             entity_id=campaign.id,
             metadata={"from": old_status, "to": campaign.status},
