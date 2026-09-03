@@ -19,6 +19,8 @@ SIGNAL_TYPES = (
     "other",
 )
 
+SIGNAL_STATUSES = ("new", "reviewed", "qualified", "dismissed")
+
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
@@ -30,6 +32,7 @@ class Signal(Base):
         Index("ix_signals_tenant_company", "tenant_id", "company_id"),
         Index("ix_signals_tenant_signal_type", "tenant_id", "signal_type"),
         Index("ix_signals_tenant_detected_at", "tenant_id", "detected_at"),
+        Index("uq_signals_tenant_fingerprint", "tenant_id", "fingerprint", unique=True),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -38,6 +41,11 @@ class Signal(Base):
     )
     company_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    evidence_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("evidence.id", ondelete="SET NULL", name="fk_signals_evidence_id"),
+        nullable=True,
+        index=True,
     )
     signal_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     title: Mapped[str | None] = mapped_column(String(500), nullable=True)
@@ -49,8 +57,10 @@ class Signal(Base):
     )
     confidence: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
     status: Mapped[str] = mapped_column(
-        String(50), nullable=False, default="active", index=True
+        String(50), nullable=False, default="new", index=True
     )
+    fingerprint: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False
     )

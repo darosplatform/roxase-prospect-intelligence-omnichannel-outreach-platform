@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from app.db.base import Base
 from app.models import (  # noqa: F401
     Activity,
+    AuditEvent,
     Campaign,
     Company,
     Contact,

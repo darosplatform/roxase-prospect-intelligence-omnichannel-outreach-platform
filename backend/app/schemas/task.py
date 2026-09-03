@@ -42,5 +42,6 @@ class TaskRead(BaseModel):
     priority: str
     due_at: datetime | None
     completed_at: datetime | None
+    deleted_at: datetime | None = None
     created_at: datetime
     updated_at: datetime

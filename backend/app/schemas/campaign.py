@@ -36,5 +36,6 @@ class CampaignRead(BaseModel):
     created_by: uuid.UUID | None
     starts_at: datetime | None
     ends_at: datetime | None
+    deleted_at: datetime | None = None
     created_at: datetime
     updated_at: datetime

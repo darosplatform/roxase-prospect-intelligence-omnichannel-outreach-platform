@@ -1,4 +1,5 @@
 from app.models.activity import ACTIVITY_TYPES, Activity
+from app.models.audit import AuditEvent
 from app.models.campaign import CAMPAIGN_CHANNELS, CAMPAIGN_STATUSES, Campaign
 from app.models.company import Company
 from app.models.contact import Contact
@@ -16,6 +17,7 @@ from app.models.workspace_member import ROLES, WorkspaceMember
 __all__ = [
     "ACTIVITY_TYPES",
     "Activity",
+    "AuditEvent",
     "CAMPAIGN_CHANNELS",
     "CAMPAIGN_STATUSES",
     "Campaign",

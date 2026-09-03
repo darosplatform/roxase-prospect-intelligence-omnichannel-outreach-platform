@@ -96,3 +96,50 @@ async def company_auth(client: AsyncClient):
     headers = await register_tenant(client, "tenant-crm", "crm@example.com")
     company_id = await create_company(client, headers, "CRM")
     return client, headers, company_id
+
+
+async def create_contact(client: AsyncClient, headers: dict, suffix: str = ""):
+    response = await client.post(
+        "/api/v1/contacts",
+        json={"first_name": f"Contact{suffix}", "last_name": f"Last{suffix}"},
+        headers=headers,
+    )
+    assert response.status_code == 201, response.text
+    return response.json()["id"]
+
+
+async def create_lead(client: AsyncClient, headers: dict, suffix: str = ""):
+    response = await client.post(
+        "/api/v1/leads",
+        json={"status": "new"},
+        headers=headers,
+    )
+    assert response.status_code == 201, response.text
+    return response.json()["id"]
+
+
+def tenant_id_from_token(token: str):
+    from app.core.security import decode_token
+
+    payload = decode_token(token)
+    assert payload is not None
+    return payload["tenant_id"]
+
+
+async def create_user_with_role(
+    client: AsyncClient, owner_headers: dict, email: str, role: str
+):
+    tenant_id = tenant_id_from_token(owner_headers["Authorization"].split(" ")[1])
+    response = await client.post(
+        "/api/v1/auth/users",
+        params={
+            "tenant_id": tenant_id,
+            "email": email,
+            "password": "supersecret",
+            "role": role,
+        },
+        json=None,
+        headers=owner_headers,
+    )
+    assert response.status_code == 201, response.text
+    return {"Authorization": f"Bearer {response.json()['access_token']}"}

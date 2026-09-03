@@ -49,15 +49,16 @@ async def get_current_active_user(user: User = Depends(get_current_user)) -> Use
 
 
 def require_role(*allowed_roles: str):
-    async def role_checker(user: User = Depends(get_current_active_user)) -> User:
-        from app.db.session import async_session_factory
+    async def role_checker(
+        db: AsyncSession = Depends(get_db),
+        user: User = Depends(get_current_active_user),
+    ) -> User:
         from app.models.workspace_member import WorkspaceMember
 
-        async with async_session_factory() as db:
-            result = await db.execute(
-                select(WorkspaceMember.role).where(WorkspaceMember.user_id == user.id)
-            )
-            roles = {row[0] for row in result.all()}
+        result = await db.execute(
+            select(WorkspaceMember.role).where(WorkspaceMember.user_id == user.id)
+        )
+        roles = {row[0] for row in result.all()}
 
         if not roles.intersection(allowed_roles):
             raise HTTPException(

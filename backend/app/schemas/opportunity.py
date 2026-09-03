@@ -47,5 +47,6 @@ class OpportunityRead(BaseModel):
     probability: float
     expected_close_at: date | None
     owner_user_id: uuid.UUID | None
+    deleted_at: datetime | None = None
     created_at: datetime
     updated_at: datetime

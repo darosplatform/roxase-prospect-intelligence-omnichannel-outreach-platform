@@ -25,5 +25,6 @@ class NoteRead(BaseModel):
     opportunity_id: uuid.UUID | None
     author_user_id: uuid.UUID
     content: str
+    deleted_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
