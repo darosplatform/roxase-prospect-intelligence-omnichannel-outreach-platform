@@ -3,8 +3,8 @@ from app.models.audit import AuditEvent
 from app.models.campaign import CAMPAIGN_CHANNELS, CAMPAIGN_STATUSES, Campaign
 from app.models.company import Company
 from app.models.contact import Contact
-from app.models.evidence import Evidence
-from app.models.lead import Lead
+from app.models.evidence import EVIDENCE_TYPES, Evidence
+from app.models.lead import QUALIFICATION_STATUSES, Lead
 from app.models.note import Note
 from app.models.opportunity import OPPORTUNITY_STAGES, Opportunity
 from app.models.signal import SIGNAL_TYPES, Signal
@@ -26,8 +26,10 @@ __all__ = [
     "Evidence",
     "Lead",
     "Note",
+    "EVIDENCE_TYPES",
     "OPPORTUNITY_STAGES",
     "Opportunity",
+    "QUALIFICATION_STATUSES",
     "ROLES",
     "SIGNAL_TYPES",
     "Signal",

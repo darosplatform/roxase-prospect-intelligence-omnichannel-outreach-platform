@@ -6,6 +6,7 @@ from app.api.v1.auth import router as auth_router
 from app.api.v1.campaigns import router as campaigns_router
 from app.api.v1.companies import router as companies_router
 from app.api.v1.contacts import router as contacts_router
+from app.api.v1.evidence import router as evidence_router
 from app.api.v1.leads import router as leads_router
 from app.api.v1.notes import router as notes_router
 from app.api.v1.opportunities import router as opportunities_router
@@ -29,6 +30,7 @@ app.include_router(companies_router, prefix="/api/v1", tags=["companies"])
 app.include_router(contacts_router, prefix="/api/v1", tags=["contacts"])
 app.include_router(leads_router, prefix="/api/v1", tags=["leads"])
 app.include_router(signals_router, prefix="/api/v1", tags=["signals"])
+app.include_router(evidence_router, prefix="/api/v1", tags=["evidence"])
 app.include_router(opportunities_router, prefix="/api/v1", tags=["opportunities"])
 app.include_router(activities_router, prefix="/api/v1", tags=["activities"])
 app.include_router(tasks_router, prefix="/api/v1", tags=["tasks"])

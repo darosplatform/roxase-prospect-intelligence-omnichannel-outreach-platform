@@ -118,6 +118,44 @@ async def create_lead(client: AsyncClient, headers: dict, suffix: str = ""):
     return response.json()["id"]
 
 
+async def create_evidence(
+    client: AsyncClient, headers: dict, suffix: str = "", company_id: str | None = None
+):
+    body = {
+        "source_url": f"https://ev{suffix}.com/r",
+        "source_name": f"Source{suffix}",
+        "evidence_type": "news",
+        "title": f"Evidence {suffix}",
+    }
+    if company_id:
+        body["company_id"] = company_id
+    response = await client.post("/api/v1/evidence", json=body, headers=headers)
+    assert response.status_code == 201, response.text
+    return response.json()["id"]
+
+
+async def create_signal(
+    client: AsyncClient,
+    headers: dict,
+    company_id: str,
+    signal_type: str = "hiring",
+    evidence_id: str | None = None,
+    confidence: float = 1.0,
+    detected_at: str | None = None,
+    status: str = "new",
+):
+    body = {"company_id": company_id, "signal_type": signal_type, "confidence": confidence}
+    if evidence_id:
+        body["evidence_id"] = evidence_id
+    if detected_at:
+        body["detected_at"] = detected_at
+    if status:
+        body["status"] = status
+    response = await client.post("/api/v1/signals", json=body, headers=headers)
+    assert response.status_code == 201, response.text
+    return response.json()["id"]
+
+
 def tenant_id_from_token(token: str):
     from app.core.security import decode_token
 
