@@ -10,6 +10,7 @@ from app.api.v1.auth import router as auth_router
 from app.api.v1.campaigns import router as campaigns_router
 from app.api.v1.companies import router as companies_router
 from app.api.v1.contacts import router as contacts_router
+from app.api.v1.discovery import router as discovery_router
 from app.api.v1.do_not_contact import router as dnc_router
 from app.api.v1.evidence import router as evidence_router
 from app.api.v1.leads import router as leads_router
@@ -61,6 +62,7 @@ app.include_router(policies_router, prefix="/api/v1", tags=["policies"])
 app.include_router(outreach_router, prefix="/api/v1", tags=["outreach"])
 app.include_router(templates_router, prefix="/api/v1", tags=["templates"])
 app.include_router(dnc_router, prefix="/api/v1", tags=["do-not-contact"])
+app.include_router(discovery_router, prefix="/api/v1", tags=["discovery"])
 app.include_router(opportunities_router, prefix="/api/v1", tags=["opportunities"])
 app.include_router(activities_router, prefix="/api/v1", tags=["activities"])
 app.include_router(tasks_router, prefix="/api/v1", tags=["tasks"])

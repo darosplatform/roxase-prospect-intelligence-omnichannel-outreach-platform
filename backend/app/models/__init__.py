@@ -3,6 +3,13 @@ from app.models.audit import AuditEvent
 from app.models.campaign import CAMPAIGN_CHANNELS, CAMPAIGN_STATUSES, Campaign
 from app.models.company import Company
 from app.models.contact import Contact
+from app.models.discovery import (
+    DISCOVERY_JOB_STATUSES,
+    DISCOVERY_SOURCE_STATUSES,
+    DiscoveryJob,
+    DiscoverySource,
+    RawDocument,
+)
 from app.models.do_not_contact import CONSENT_BASIS, Consent, DoNotContact
 from app.models.evidence import EVIDENCE_TYPES, Evidence
 from app.models.lead import QUALIFICATION_STATUSES, Lead
@@ -30,6 +37,10 @@ __all__ = [
     "Consent",
     "Contact",
     "DoNotContact",
+    "DISCOVERY_JOB_STATUSES",
+    "DiscoveryJob",
+    "DISCOVERY_SOURCE_STATUSES",
+    "DiscoverySource",
     "EVIDENCE_TYPES",
     "Evidence",
     "Lead",
@@ -43,6 +54,7 @@ __all__ = [
     "POLICY_VERSION",
     "PolicyDecision",
     "QUALIFICATION_STATUSES",
+    "RawDocument",
     "ROLES",
     "SIGNAL_TYPES",
     "Signal",
