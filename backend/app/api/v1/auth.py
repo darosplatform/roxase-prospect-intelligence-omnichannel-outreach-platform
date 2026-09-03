@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.limits import default_limiter
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -25,6 +26,7 @@ async def register(
     payload: UserCreate,
     slug: str,
     tenant_name: str | None = None,
+    _ratelimit=Depends(default_limiter),
     db: AsyncSession = Depends(get_db),
 ) -> TokenResponse:
     existing_slug = await db.execute(select(Tenant).where(Tenant.slug == slug))
@@ -75,6 +77,7 @@ async def register(
 @router.post("/login", response_model=TokenResponse)
 async def login(
     payload: LoginRequest,
+    _ratelimit=Depends(default_limiter),
     db: AsyncSession = Depends(get_db),
 ) -> TokenResponse:
     result = await db.execute(select(User).where(User.email == payload.email))
@@ -94,6 +97,7 @@ async def login(
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(
     payload: RefreshRequest,
+    _ratelimit=Depends(default_limiter),
     db: AsyncSession = Depends(get_db),
 ) -> TokenResponse:
     decoded = decode_token(payload.refresh_token)

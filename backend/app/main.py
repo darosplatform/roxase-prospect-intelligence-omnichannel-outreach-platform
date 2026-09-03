@@ -1,6 +1,10 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.health import router as health_router
+from app.api.metrics import router as metrics_router
 from app.api.v1.activities import router as activities_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.campaigns import router as campaigns_router
@@ -18,15 +22,33 @@ from app.api.v1.tasks import router as tasks_router
 from app.api.v1.templates import router as templates_router
 from app.api.v1.tenants import router as tenants_router
 from app.api.v1.workspaces import router as workspaces_router
+from app.core.cache import close_redis
+from app.core.config import settings, validate_production
+from app.core.logging_config import configure_logging
+from app.middleware.request_id import RequestIdMiddleware
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    validate_production(settings)
+    configure_logging(settings.log_json)
+    yield
+    await close_redis()
+
 
 app = FastAPI(
     title="ROXASE API",
     version="0.1.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(RequestIdMiddleware)
+
 app.include_router(health_router)
+app.include_router(metrics_router)
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(tenants_router, prefix="/api/v1")
 app.include_router(workspaces_router, prefix="/api/v1")

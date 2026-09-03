@@ -38,3 +38,6 @@ alembic/versions/*.pyc
 # OS
 .DS_Store
 Thumbs.db
+
+# Database backups
+backups/

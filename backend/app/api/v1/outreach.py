@@ -13,6 +13,7 @@ from app.api.validators import (
     assert_template_in_tenant,
 )
 from app.core.audit import record_audit
+from app.core.limits import default_limiter
 from app.db.session import get_db
 from app.models.campaign import Campaign
 from app.models.contact import Contact
@@ -89,6 +90,7 @@ async def create_outreach_request(
     payload: OutreachRequestCreate,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_role("owner", "admin", "manager", "operator")),
+    _ratelimit=Depends(default_limiter),
 ) -> OutreachRequest:
     lead_result = await db.execute(
         select(Lead)

@@ -12,19 +12,42 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 import uuid
 
+from sqlalchemy import func, select
+
 from app.core.config import settings
+from app.core.metrics import metrics, set_processing_latency
 from app.db.session import async_session_factory
+from app.models.outreach_request import OutreachRequest
 from app.services import outbox
 
 logger = logging.getLogger("roxase.worker")
 
 
+async def _queue_depth() -> int:
+    """Number of currently queued/claimable-outbox requests for gauge export."""
+    async with async_session_factory() as session:
+        result = await session.execute(
+            select(func.count())
+            .select_from(OutreachRequest)
+            .where(
+                OutreachRequest.status.in_(("queued", "dispatching"))
+            )
+        )
+        return result.scalar_one()
+
+
 async def _process_poll() -> int:
     """One poll round: claim + process a batch. Returns handles count."""
+    start = time.monotonic()
+    handled = 0
     async with async_session_factory() as session:
-        return await outbox.run_once(session, worker_id=_worker_id())
+        handled = await outbox.run_once(session, worker_id=_worker_id())
+    set_processing_latency(time.monotonic() - start)
+    metrics.set("outreach_queue_depth", await _queue_depth())
+    return handled
 
 
 _worker_id_cache: str | None = None
