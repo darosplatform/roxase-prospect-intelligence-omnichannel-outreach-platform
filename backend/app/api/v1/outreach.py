@@ -121,7 +121,7 @@ async def create_outreach_request(
         contact.id if contact else None,
         channel,
         payload.template_id,
-        "default-send",
+        payload.logical_send_id,
     )
 
     existing = await find_by_idempotency(db, user.tenant_id, idempotency_key)

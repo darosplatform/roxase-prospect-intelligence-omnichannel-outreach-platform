@@ -16,6 +16,7 @@ class OutreachRequestCreate(BaseModel):
     channel: str = Field(..., pattern=_CHANNEL_PATTERN)
     template_id: uuid.UUID | None = None
     scheduled_at: datetime | None = None
+    logical_send_id: str = Field(default="default", max_length=255)
 
 
 class OutreachRequestRead(BaseModel):

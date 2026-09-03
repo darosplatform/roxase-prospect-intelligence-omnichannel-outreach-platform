@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.crud_helpers import apply_sort, paginate
+from app.api.crud_helpers import apply_sort, paginate, prepare_search
 from app.api.deps import get_current_active_user, require_role
 from app.api.validators import assert_company_in_tenant, assert_evidence_in_tenant
 from app.core.audit import record_audit
@@ -39,6 +39,7 @@ def _fingerprint(tenant_id: uuid.UUID, payload: dict) -> str:
 async def list_signals(
     skip: int = 0,
     limit: int = 50,
+    q: str | None = None,
     signal_type: str | None = None,
     status: str | None = None,
     company_id: uuid.UUID | None = None,
@@ -51,6 +52,10 @@ async def list_signals(
     stmt = select(Signal).where(
         Signal.tenant_id == user.tenant_id, Signal.deleted_at.is_(None)
     )
+    if q:
+        stmt = prepare_search(
+            stmt, [Signal.title, Signal.description, Signal.source_name], q
+        )
     if signal_type:
         stmt = stmt.where(Signal.signal_type == signal_type)
     if status:

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.crud_helpers import apply_sort, paginate
+from app.api.crud_helpers import apply_sort, paginate, prepare_search
 from app.api.deps import get_current_active_user, require_role
 from app.api.validators import (
     assert_company_in_tenant,
@@ -63,6 +63,7 @@ async def _get_owned_opportunity(
 async def list_opportunities(
     skip: int = 0,
     limit: int = 50,
+    q: str | None = None,
     stage: str | None = None,
     company_id: uuid.UUID | None = None,
     owner_user_id: uuid.UUID | None = None,
@@ -73,6 +74,8 @@ async def list_opportunities(
     stmt = select(Opportunity).where(
         Opportunity.tenant_id == user.tenant_id, Opportunity.deleted_at.is_(None)
     )
+    if q:
+        stmt = prepare_search(stmt, [Opportunity.name, Opportunity.description], q)
     if stage:
         stmt = stmt.where(Opportunity.stage == stage)
     if company_id:
