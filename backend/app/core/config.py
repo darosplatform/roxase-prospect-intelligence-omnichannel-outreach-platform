@@ -18,6 +18,20 @@ class Settings(BaseSettings):
     # When False, real sends are blocked; dry-run simulation is still allowed.
     outreach_enabled: bool = True
 
+    # Sticky dry-run guard. When True, NO real external send may ever occur:
+    # providers are not contacted and a simulated result is recorded. Kept True
+    # by default; only disabled explicitly per deployment for a real channel.
+    dry_run: bool = True
+
+    # Outbox worker.
+    worker_enabled: bool = True
+    worker_poll_interval: float = 1.0
+    worker_batch_size: int = 50
+    worker_lease_seconds: int = 60
+    worker_max_attempts: int = 5
+    worker_base_backoff: float = 2.0
+    worker_max_backoff: float = 600.0
+
     model_config = {
         "env_prefix": "",
         "env_file": ".env",

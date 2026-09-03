@@ -12,19 +12,16 @@ idempotency key so a replayed intention does not send twice.
 
 import hashlib
 import uuid
-from datetime import UTC, datetime
 
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit import record_audit
-from app.core.config import settings
-from app.models.contact import Contact
 from app.models.outreach_request import OutreachRequest
 from app.models.policy_decision import PolicyDecision
+from app.services import outbox
 from app.services import policy as policy_mod
-from app.services.providers import Message, registry
 
 
 def make_idempotency_key(
@@ -127,7 +124,14 @@ async def find_by_idempotency(
 async def dispatch_request(
     db: AsyncSession, req: OutreachRequest, dry_run: bool
 ) -> OutreachRequest:
-    """Execute an approved request through the outbox -> provider flow."""
+    """Enqueue and execute an approved request via the outbox engine.
+
+    This is a thin adapter over the outbox execution engine so the API route
+    shares the SAME runtime authority as the background worker (`process_request`).
+    There is no second, divergent dispatch path. `dry_run` is accepted for
+    backwards compatibility but the global sticky `settings.dry_run` / kill
+    switch remain authoritative inside the engine.
+    """
     if req.status not in ("approved", "queued"):
         raise HTTPException(status_code=409, detail=f"Cannot dispatch status '{req.status}'")
 
@@ -142,66 +146,16 @@ async def dispatch_request(
             entity_id=req.id,
         )
         await db.flush()
+        await db.commit()
+        await db.refresh(req)
 
-    # Kill switch: block real sends, still allow dry-run simulation.
-    if dry_run or not settings.outreach_enabled:
-        req.status = "sent"
-        req.sent_at = datetime.now(UTC)
-        req.provider_message_id = f"dry_run:{req.id}"
-        await record_audit(
-            db,
-            tenant_id=req.tenant_id,
-            action="outreach.simulated",
-            entity_type="outreach_request",
-            entity_id=req.id,
-            metadata={"dry_run": True},
-        )
-        await db.flush()
+    claimed = await outbox.claim_requests(db, worker_id="api-sync", batch_size=1)
+    target = next((r for r in claimed if r.id == req.id), None)
+    if target is None:
+        # Another authority already claimed/processed it; return the fresh state.
+        await db.refresh(req)
         return req
 
-    req.status = "dispatching"
-    await db.flush()
-
-    provider = registry.provider_for(req.channel)
-    message = Message(
-        id=req.id,
-        channel=req.channel,
-        to=await _recipient(db, req),
-        template_id=req.template_id,
-        tenant_id=req.tenant_id,
-        campaign_id=req.campaign_id,
-        metadata={"idempotency_key": req.idempotency_key},
-    )
-    result = provider.send(message)
-    if result.ok:
-        req.status = "sent"
-        req.sent_at = datetime.now(UTC)
-        req.provider_message_id = result.provider_message_id
-        await record_audit(
-            db,
-            tenant_id=req.tenant_id,
-            action="outreach.sent",
-            entity_type="outreach_request",
-            entity_id=req.id,
-            metadata={"provider_message_id": result.provider_message_id},
-        )
-    else:
-        req.status = "failed"
-        await record_audit(
-            db,
-            tenant_id=req.tenant_id,
-            action="outreach.failed",
-            entity_type="outreach_request",
-            entity_id=req.id,
-            metadata={"error": result.error},
-        )
-    await db.flush()
+    await outbox.process_request(db, target)
+    await db.refresh(req)
     return req
-
-
-async def _recipient(db: AsyncSession, req: OutreachRequest) -> str:
-    if req.contact_id:
-        contact = await db.get(Contact, req.contact_id)
-        if contact is not None and contact.email:
-            return contact.email
-    return req.idempotency_key or str(req.id)
