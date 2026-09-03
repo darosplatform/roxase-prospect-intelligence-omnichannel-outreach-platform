@@ -69,3 +69,30 @@ async def auth_client(client: AsyncClient):
     token = response.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
     return client, headers
+
+
+async def register_tenant(client: AsyncClient, slug: str, email: str):
+    response = await client.post(
+        "/api/v1/auth/register",
+        params={"slug": slug},
+        json={"email": email, "password": "supersecret"},
+    )
+    assert response.status_code == 201, response.text
+    return {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+
+async def create_company(client: AsyncClient, headers: dict, suffix: str = ""):
+    response = await client.post(
+        "/api/v1/companies",
+        json={"legal_name": f"Company{suffix}", "domain": f"company{suffix}.com"},
+        headers=headers,
+    )
+    assert response.status_code == 201, response.text
+    return response.json()["id"]
+
+
+@pytest_asyncio.fixture
+async def company_auth(client: AsyncClient):
+    headers = await register_tenant(client, "tenant-crm", "crm@example.com")
+    company_id = await create_company(client, headers, "CRM")
+    return client, headers, company_id
