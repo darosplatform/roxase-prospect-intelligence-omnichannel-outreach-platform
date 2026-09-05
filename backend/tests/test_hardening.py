@@ -58,8 +58,31 @@ def test_production_accepts_strong_secure_config():
         jwt_secret_key="L" * 48,
         database_url="postgresql+asyncpg://host/db",
         rate_limit_enabled=True,
+        cors_allowed_origins="https://app.roxase.example",
     )
     validate_production(s)
+
+
+def test_production_rejects_wildcard_cors():
+    s = Settings(
+        env="production",
+        jwt_secret_key="L" * 48,
+        database_url="postgresql+asyncpg://host/db",
+        rate_limit_enabled=True,
+        cors_allowed_origins="*",
+    )
+    with pytest.raises(RuntimeError):
+        validate_production(s)
+
+
+def test_cors_origins_list_parses_comma_separated():
+    s = Settings(cors_allowed_origins="https://a.example, https://b.example")
+    assert s.cors_origins_list == ["https://a.example", "https://b.example"]
+
+
+def test_cors_origins_list_wildcard():
+    s = Settings(cors_allowed_origins="*")
+    assert s.cors_origins_list == ["*"]
 
 
 def test_local_is_not_gated():

@@ -42,6 +42,13 @@ class Settings(BaseSettings):
     discovery_fetch_max_bytes: int = 5_000_000
     discovery_fetch_user_agent: str = "ROXASE-Discovery/1.0 (+https://roxase.invalid/bot)"
 
+    # CORS. Comma-separated origins, or "*" for any origin (the default,
+    # safe only because auth is Bearer-token, not cookie-based, and
+    # allow_credentials is never enabled — no ambient credential can be
+    # exfiltrated via a wildcard origin). Production must set an explicit
+    # allowlist instead; enforced by validate_production below.
+    cors_allowed_origins: str = "*"
+
     # Observability / hardening.
     log_json: bool = False
     db_pool_size: int = 10
@@ -58,6 +65,12 @@ class Settings(BaseSettings):
         "env_file_encoding": "utf-8",
         "extra": "ignore",
     }
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        if self.cors_allowed_origins.strip() == "*":
+            return ["*"]
+        return [o.strip() for o in self.cors_allowed_origins.split(",") if o.strip()]
 
 
 _EXAMPLE_JWT = "change-me-in-production-use-openssl-rand-hex-32"
@@ -79,6 +92,8 @@ def validate_production(settings: "Settings") -> None:
         problems.append("database_url must be postgresql+asyncpg (PostgreSQL)")
     if settings.rate_limit_enabled is False:
         problems.append("rate_limit_enabled must be True in production")
+    if settings.cors_allowed_origins.strip() == "*":
+        problems.append("cors_allowed_origins must be an explicit allowlist, not '*'")
     if problems:
         raise RuntimeError("Insecure production configuration: " + "; ".join(problems))
 
