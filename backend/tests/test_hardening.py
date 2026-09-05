@@ -105,6 +105,32 @@ async def test_rate_limiter_block_after_limit(monkeypatch):
     assert getattr(exc.value, "status_code", None) == 429
 
 
+class _BrokenRedis:
+    """Simulates a Redis outage: every call raises."""
+
+    async def incr(self, key: str) -> int:
+        raise ConnectionError("redis unreachable")
+
+    async def expire(self, key: str, ttl: int) -> None:
+        raise ConnectionError("redis unreachable")
+
+
+@pytest.mark.asyncio
+async def test_rate_limiter_degrades_open_by_default_on_redis_outage(monkeypatch):
+    monkeypatch.setattr("app.core.cache.redis_client", _BrokenRedis())
+    limiter = RateLimiter(limit=1, window_seconds=5, scope="default")
+    await limiter(_FakeRequest())  # would raise if it didn't degrade open
+
+
+@pytest.mark.asyncio
+async def test_auth_rate_limiter_fails_closed_on_redis_outage(monkeypatch):
+    monkeypatch.setattr("app.core.cache.redis_client", _BrokenRedis())
+    limiter = RateLimiter(limit=1, window_seconds=5, scope="auth", fail_open=False)
+    with pytest.raises(Exception) as exc:
+        await limiter(_FakeRequest())
+    assert getattr(exc.value, "status_code", None) == 503
+
+
 @pytest.mark.asyncio
 async def test_rate_limiter_disabled_when_config_off(monkeypatch):
     fake = _FakeRedis()

@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.limits import default_limiter
+from app.api.deps import require_role
+from app.core.limits import auth_limiter, default_limiter
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -26,7 +27,7 @@ async def register(
     payload: UserCreate,
     slug: str,
     tenant_name: str | None = None,
-    _ratelimit=Depends(default_limiter),
+    _ratelimit=Depends(auth_limiter),
     db: AsyncSession = Depends(get_db),
 ) -> TokenResponse:
     existing_slug = await db.execute(select(Tenant).where(Tenant.slug == slug))
@@ -77,7 +78,7 @@ async def register(
 @router.post("/login", response_model=TokenResponse)
 async def login(
     payload: LoginRequest,
-    _ratelimit=Depends(default_limiter),
+    _ratelimit=Depends(auth_limiter),
     db: AsyncSession = Depends(get_db),
 ) -> TokenResponse:
     result = await db.execute(select(User).where(User.email == payload.email))
@@ -123,20 +124,17 @@ async def refresh_token(
 
 @router.post("/users", response_model=TokenResponse, status_code=201)
 async def create_user_in_tenant(
-    tenant_id: str,
     email: str,
     password: str,
     full_name: str | None = None,
-    role: str = "owner",
+    role: str = "viewer",
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role("owner", "admin")),
 ) -> TokenResponse:
-    import uuid as _uuid
-
-    tid = _uuid.UUID(tenant_id)
-    result = await db.execute(select(Tenant).where(Tenant.id == tid))
-    tenant = result.scalar_one_or_none()
-    if not tenant:
-        raise HTTPException(status_code=404, detail="Tenant not found")
+    # The caller's own tenant is the only tenant this endpoint can ever
+    # target — a client-supplied tenant_id would let any owner/admin create
+    # accounts (including "owner") inside a tenant that isn't theirs.
+    tid = current_user.tenant_id
 
     existing_user = await db.execute(select(User).where(User.email == email))
     if existing_user.scalar_one_or_none():

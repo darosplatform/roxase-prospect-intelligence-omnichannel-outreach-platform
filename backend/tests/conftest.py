@@ -34,15 +34,27 @@ async def _reset_rate_limits():
     Clearing only the rate-limit keys (not all of Redis, though nothing else
     currently lives there) before each test keeps the suite deterministic.
 
-    Deliberately does NOT use app.core.cache.get_redis(): that client is a
-    process-global singleton bound to whichever event loop first created it,
-    which under pytest-asyncio's per-test event loop breaks on any later
-    test with "Event loop is closed" (the app's own RateLimiter never hits
-    this because it silently swallows that exact exception and degrades
-    open). A short-lived connection scoped to this fixture's own loop avoids
-    the cross-loop reuse entirely.
+    Deliberately does NOT use app.core.cache.get_redis() to clear those keys:
+    that client is a process-global singleton bound to whichever event loop
+    first created it, which under pytest-asyncio's per-test event loop
+    breaks on any later test with "Event loop is closed" (the default-scope
+    RateLimiter never hit this because it silently swallows that exact
+    exception and degrades open -- but a fail-closed limiter, e.g. on the
+    auth endpoints, surfaces it as a real, suite-wide 503). A short-lived
+    connection scoped to this fixture's own loop avoids the cross-loop reuse
+    for the cleanup itself.
+
+    Also resets app.core.cache.redis_client to None so that the *app's own*
+    next real get_redis() call (inside RateLimiter, triggered by whatever
+    this test does) lazily builds a fresh client bound to this test's event
+    loop, instead of reusing a connection left over from a previous test's
+    now-closed loop. Tests in test_hardening.py that monkeypatch
+    app.core.cache.redis_client themselves run after this fixture, so their
+    explicit fake client is unaffected.
     """
     from redis.asyncio import Redis
+
+    import app.core.cache as cache
 
     redis = Redis.from_url(settings.redis_url, decode_responses=True)
     try:
@@ -50,6 +62,7 @@ async def _reset_rate_limits():
             await redis.delete(key)
     finally:
         await redis.aclose()
+    cache.redis_client = None
     yield
 
 

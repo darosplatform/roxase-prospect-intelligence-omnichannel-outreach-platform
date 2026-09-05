@@ -22,12 +22,27 @@ logger = logging.getLogger("roxase.ratelimit")
 
 
 class RateLimiter:
-    """Redis-backed fixed-window rate limiter for a configurable scope."""
+    """Redis-backed fixed-window rate limiter for a configurable scope.
 
-    def __init__(self, limit: int, window_seconds: int, scope: str = "api"):
+    `fail_open` controls what happens when Redis itself is unreachable:
+    True (the default) degrades open, since a cache outage should never
+    block ordinary API traffic. Unauthenticated, abuse-prone endpoints
+    (login, registration) pass `fail_open=False` instead — for those, a
+    Redis outage removing the only brute-force guard is worse than a
+    503 during the outage.
+    """
+
+    def __init__(
+        self,
+        limit: int,
+        window_seconds: int,
+        scope: str = "api",
+        fail_open: bool = True,
+    ):
         self.limit = limit
         self.window = window_seconds
         self.scope = scope
+        self.fail_open = fail_open
 
     def _key(self, identity: str) -> str:
         return f"rl:{self.scope}:{identity}"
@@ -46,8 +61,17 @@ class RateLimiter:
                 raise HTTPException(status_code=429, detail="rate limit exceeded")
         except HTTPException:
             raise
-        except Exception:  # pragma: no cover - Redis outage degrades open
-            logger.warning("rate limiter unavailable (Redis); skipping enforcement")
+        except Exception:  # Redis outage: degrade per fail_open policy
+            if self.fail_open:
+                logger.warning("rate limiter unavailable (Redis); skipping enforcement")
+                return
+            logger.error(
+                "rate limiter unavailable (Redis); failing closed for scope=%s",
+                self.scope,
+            )
+            raise HTTPException(
+                status_code=503, detail="service temporarily unavailable"
+            ) from None
 
     def _identity(self, request: Request) -> str:
         user = getattr(request.state, "user", None)
@@ -61,4 +85,14 @@ default_limiter = RateLimiter(
     limit=settings.rate_limit_burst,
     window_seconds=settings.rate_limit_window,
     scope="default",
+)
+
+# Unauthenticated auth entrypoints (login, registration): brute-force /
+# signup-spam protection that must not silently disappear during a Redis
+# outage, so it fails closed instead of open.
+auth_limiter = RateLimiter(
+    limit=settings.rate_limit_burst,
+    window_seconds=settings.rate_limit_window,
+    scope="auth",
+    fail_open=False,
 )
