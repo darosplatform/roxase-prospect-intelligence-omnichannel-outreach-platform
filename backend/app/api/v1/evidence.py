@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +16,8 @@ from app.db.session import get_db
 from app.models.evidence import Evidence
 from app.models.user import User
 from app.schemas.evidence import EvidenceCreate, EvidenceRead
+from app.schemas.signal import SignalRead
+from app.services.signal_detection import ingest_evidence
 
 router = APIRouter()
 
@@ -84,3 +86,33 @@ async def create_evidence(
     )
     await db.refresh(evidence)
     return evidence
+
+
+async def _get_owned_evidence(
+    db: AsyncSession, evidence_id: uuid.UUID, tenant_id: uuid.UUID
+) -> Evidence:
+    result = await db.execute(
+        select(Evidence).where(Evidence.id == evidence_id, Evidence.tenant_id == tenant_id)
+    )
+    evidence = result.scalar_one_or_none()
+    if evidence is None:
+        raise HTTPException(status_code=404, detail="Evidence not found")
+    return evidence
+
+
+@router.post("/evidence/{evidence_id}/detect-signal", response_model=SignalRead | None)
+async def detect_evidence_signal(
+    evidence_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("owner", "admin", "manager")),
+):
+    """Signal Intelligence (C4): run the deterministic keyword/evidence_type
+    classifier against this Evidence. Returns null when there is no support
+    for any signal (nothing is ever fabricated) — that is a normal, valid
+    outcome, not an error. Idempotent: re-running against the same evidence
+    returns the same already-created Signal rather than duplicating it.
+    """
+    evidence = await _get_owned_evidence(db, evidence_id, user.tenant_id)
+    signal = await ingest_evidence(db, user.tenant_id, evidence)
+    await db.commit()
+    return signal

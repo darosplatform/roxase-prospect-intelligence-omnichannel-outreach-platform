@@ -1,5 +1,3 @@
-import hashlib
-import json
 import uuid
 from datetime import UTC, datetime
 
@@ -15,24 +13,11 @@ from app.db.session import get_db
 from app.models.signal import Signal
 from app.models.user import User
 from app.schemas.signal import SignalCreate, SignalRead
+from app.services.signal_detection import signal_fingerprint
 
 router = APIRouter()
 
 SORT_FIELDS = {"created_at": Signal.created_at, "detected_at": Signal.detected_at}
-
-
-def _fingerprint(tenant_id: uuid.UUID, payload: dict) -> str:
-    raw = json.dumps(
-        {
-            "tenant_id": str(tenant_id),
-            "signal_type": payload.get("signal_type"),
-            "company_id": str(payload.get("company_id")),
-            "source_url": (payload.get("source_url") or "").strip(),
-            "source_name": (payload.get("source_name") or "").strip(),
-        },
-        sort_keys=True,
-    )
-    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 @router.get("/signals", response_model=list[SignalRead])
@@ -83,7 +68,13 @@ async def create_signal(
         await assert_evidence_in_tenant(db, payload.evidence_id, user.tenant_id)
 
     data = payload.model_dump()
-    fp = _fingerprint(user.tenant_id, data)
+    fp = signal_fingerprint(
+        user.tenant_id,
+        signal_type=data.get("signal_type"),
+        company_id=data.get("company_id"),
+        source_url=data.get("source_url"),
+        source_name=data.get("source_name"),
+    )
     existing = await db.execute(
         select(Signal).where(
             Signal.tenant_id == user.tenant_id,
