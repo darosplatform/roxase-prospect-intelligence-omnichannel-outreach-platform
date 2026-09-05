@@ -23,10 +23,12 @@ from app.schemas.discovery import (
     DiscoveryJobUpdate,
     DiscoverySourceCreate,
     DiscoverySourceRead,
+    ExtractionResultRead,
     RawDocumentCreate,
     RawDocumentRead,
 )
 from app.services import discovery as svc
+from app.services import extraction as extraction_svc
 
 router = APIRouter()
 
@@ -170,6 +172,41 @@ async def fetch_discovery_source(
     source = await _get_source(db, source_id, user.tenant_id)
     source, _doc = await svc.fetch_source(db, user.tenant_id, source)
     return source
+
+
+@router.post(
+    "/discovery/sources/{source_id}/extract",
+    response_model=ExtractionResultRead,
+)
+async def extract_discovery_source(
+    source_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("owner", "admin", "manager")),
+) -> ExtractionResultRead:
+    """Run extraction (C3) against this source's most recent RawDocument.
+
+    Produces/enriches a Company and any Contact candidates found on the
+    page, plus one provenance-preserving Evidence record. Never creates a
+    Signal or a Lead — that boundary belongs to C4/C5. 404s if no
+    RawDocument has been captured for this source yet (run fetch first).
+    """
+    source = await _get_source(db, source_id, user.tenant_id)
+    raw_document = await svc.get_latest_raw_document(db, user.tenant_id, source.id)
+    if raw_document is None:
+        raise HTTPException(
+            status_code=409, detail="no RawDocument for this source yet; fetch it first"
+        )
+    outcome = await extraction_svc.ingest_raw_document(
+        db, user.tenant_id, raw_document=raw_document, source=source
+    )
+    await db.commit()
+    return ExtractionResultRead(
+        company_id=outcome.company_id,
+        contact_ids=outcome.contact_ids,
+        evidence_id=outcome.evidence_id,
+        page_type=outcome.page_type,
+        skipped_reason=outcome.skipped_reason,
+    )
 
 
 @router.post("/discovery/raw", response_model=RawDocumentRead, status_code=201)

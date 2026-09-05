@@ -288,5 +288,25 @@ async def fetch_source(
     return source, doc
 
 
+async def get_latest_raw_document(
+    db: AsyncSession, tenant_id: uuid.UUID, source_id: uuid.UUID
+) -> RawDocument | None:
+    """Most recent RawDocument stored against this exact source_id.
+
+    Note: `store_raw_document` dedups globally per (tenant, content_hash), so
+    if this source's fetched content is byte-identical to a document already
+    captured under a different source, that earlier document keeps its
+    original source_id and nothing is returned here for THIS source — there
+    is genuinely nothing new to extract for duplicate content.
+    """
+    result = await db.execute(
+        select(RawDocument)
+        .where(RawDocument.tenant_id == tenant_id, RawDocument.source_id == source_id)
+        .order_by(RawDocument.fetched_at.desc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
 def list_job_statuses() -> list[str]:
     return list(DISCOVERY_JOB_STATUSES)

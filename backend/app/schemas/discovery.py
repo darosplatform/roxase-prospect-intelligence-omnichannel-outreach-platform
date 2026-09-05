@@ -74,6 +74,14 @@ class RawDocumentCreate(BaseModel):
     http_status: int | None = None
 
 
+class ExtractionResultRead(BaseModel):
+    company_id: uuid.UUID | None
+    contact_ids: list[uuid.UUID]
+    evidence_id: uuid.UUID | None
+    page_type: str
+    skipped_reason: str | None = None
+
+
 class RawDocumentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
