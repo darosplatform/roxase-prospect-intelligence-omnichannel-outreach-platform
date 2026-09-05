@@ -122,8 +122,11 @@ metrics.register("http_requests_client_errors_total", "counter", "HTTP 4xx respo
 metrics.register("http_requests_server_errors_total", "counter", "HTTP 5xx responses")
 metrics.register("http_in_flight", "gauge", "HTTP requests currently in flight")
 
-metrics.register("discovery_jobs_total", "counter", "Total discovery jobs created")
+metrics.register(
+    "discovery_jobs_total", "counter", "Total discovery jobs completed successfully (status=done)"
+)
 metrics.register("discovery_jobs_failed_total", "counter", "Discovery jobs that ended failed")
+metrics.register("discovery_jobs_created_total", "counter", "Total discovery jobs created")
 metrics.register("discovery_fetch_total", "counter", "Total secure-fetch attempts")
 metrics.register(
     "discovery_fetch_blocked_ssrf_total", "counter", "Fetches blocked by SSRF safety checks"
@@ -143,6 +146,13 @@ metrics.register(
 metrics.register(
     "discovery_worker_retried_total", "counter", "Discovery jobs scheduled for retry"
 )
+metrics.register("signals_detected_total", "counter", "Total new signals detected from evidence")
+metrics.register("leads_created_total", "counter", "Total leads created")
+metrics.register("leads_qualified_total", "counter", "Leads whose qualification became 'qualified'")
+metrics.register(
+    "outreach_policy_denied_total", "counter", "Outreach requests denied by the policy engine"
+)
+metrics.register("outreach_queued_total", "counter", "Outreach requests moved to queued")
 
 
 def set_processing_latency(seconds: float) -> None:

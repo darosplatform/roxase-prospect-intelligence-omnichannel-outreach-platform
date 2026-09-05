@@ -84,6 +84,7 @@ async def create_job(
     db.add(job)
     await db.flush()
     await db.refresh(job)
+    metrics.inc("discovery_jobs_created_total")
     return job
 
 

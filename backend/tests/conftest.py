@@ -5,6 +5,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
+from app.core.config import settings
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
@@ -20,6 +21,36 @@ async def test_engine():
         await conn.run_sync(Base.metadata.create_all)
     yield engine
     await engine.dispose()
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def _reset_rate_limits():
+    """Every test shares one rate-limited "identity" (the ASGI test client
+    reports a constant host, and unauthenticated routes like /auth/register
+    fall back to it), so fixed-window counters in Redis accumulate across
+    unrelated tests. Left alone, a fast, growing test suite eventually trips
+    a real 429 on an ordinary test with no bursty behavior of its own — a
+    flaky-suite bug, not an application bug (the limiter itself is correct).
+    Clearing only the rate-limit keys (not all of Redis, though nothing else
+    currently lives there) before each test keeps the suite deterministic.
+
+    Deliberately does NOT use app.core.cache.get_redis(): that client is a
+    process-global singleton bound to whichever event loop first created it,
+    which under pytest-asyncio's per-test event loop breaks on any later
+    test with "Event loop is closed" (the app's own RateLimiter never hits
+    this because it silently swallows that exact exception and degrades
+    open). A short-lived connection scoped to this fixture's own loop avoids
+    the cross-loop reuse entirely.
+    """
+    from redis.asyncio import Redis
+
+    redis = Redis.from_url(settings.redis_url, decode_responses=True)
+    try:
+        async for key in redis.scan_iter("rl:*"):
+            await redis.delete(key)
+    finally:
+        await redis.aclose()
+    yield
 
 
 @pytest_asyncio.fixture

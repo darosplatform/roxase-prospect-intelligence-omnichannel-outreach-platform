@@ -13,6 +13,7 @@ from app.api.validators import (
     assert_evidence_in_tenant,
 )
 from app.core.audit import record_audit
+from app.core.metrics import metrics
 from app.db.session import get_db
 from app.models.lead import Lead
 from app.models.user import User
@@ -91,6 +92,7 @@ async def create_lead(
         entity_id=lead.id,
     )
     await db.refresh(lead)
+    metrics.inc("leads_created_total")
     return lead
 
 
@@ -164,6 +166,8 @@ async def qualify_lead(
     )
     await db.flush()
     await db.refresh(lead)
+    if payload.status == "qualified":
+        metrics.inc("leads_qualified_total")
     return lead
 
 

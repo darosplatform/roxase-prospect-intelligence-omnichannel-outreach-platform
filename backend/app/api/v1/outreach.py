@@ -14,6 +14,7 @@ from app.api.validators import (
 )
 from app.core.audit import record_audit
 from app.core.limits import default_limiter
+from app.core.metrics import metrics
 from app.db.session import get_db
 from app.models.campaign import Campaign
 from app.models.contact import Contact
@@ -161,6 +162,7 @@ async def create_outreach_request(
         db.add(req)
         await db.flush()
         await db.refresh(req)
+        metrics.inc("outreach_policy_denied_total")
         return req
 
     # A REVIEW needs human judgement; leave the request pending for a review path.

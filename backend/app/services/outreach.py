@@ -18,6 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit import record_audit
+from app.core.metrics import metrics
 from app.models.outreach_request import OutreachRequest
 from app.models.policy_decision import PolicyDecision
 from app.services import outbox
@@ -148,6 +149,7 @@ async def dispatch_request(
         await db.flush()
         await db.commit()
         await db.refresh(req)
+        metrics.inc("outreach_queued_total")
 
     claimed = await outbox.claim_requests(db, worker_id="api-sync", batch_size=1)
     target = next((r for r in claimed if r.id == req.id), None)

@@ -23,6 +23,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.metrics import metrics
 from app.models.evidence import Evidence
 from app.models.signal import Signal
 
@@ -278,4 +279,5 @@ async def ingest_evidence(
     db.add(signal)
     await db.flush()
     await db.refresh(signal)
+    metrics.inc("signals_detected_total")
     return signal
