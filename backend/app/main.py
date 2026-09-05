@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.health import router as health_router
 from app.api.metrics import router as metrics_router
 from app.api.v1.activities import router as activities_router
+from app.api.v1.audit import router as audit_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.campaigns import router as campaigns_router
 from app.api.v1.companies import router as companies_router
@@ -68,3 +69,4 @@ app.include_router(activities_router, prefix="/api/v1", tags=["activities"])
 app.include_router(tasks_router, prefix="/api/v1", tags=["tasks"])
 app.include_router(notes_router, prefix="/api/v1", tags=["notes"])
 app.include_router(campaigns_router, prefix="/api/v1", tags=["campaigns"])
+app.include_router(audit_router, prefix="/api/v1", tags=["audit"])
