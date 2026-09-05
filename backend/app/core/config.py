@@ -32,6 +32,16 @@ class Settings(BaseSettings):
     worker_base_backoff: float = 2.0
     worker_max_backoff: float = 600.0
 
+    # Secure fetcher (C2 discovery). All connections are validated against
+    # network_safety before any byte is sent; these bound the worst case once
+    # a connection is allowed.
+    discovery_fetch_connect_timeout: float = 5.0
+    discovery_fetch_read_timeout: float = 10.0
+    discovery_fetch_total_timeout: float = 20.0
+    discovery_fetch_max_redirects: int = 5
+    discovery_fetch_max_bytes: int = 5_000_000
+    discovery_fetch_user_agent: str = "ROXASE-Discovery/1.0 (+https://roxase.invalid/bot)"
+
     # Observability / hardening.
     log_json: bool = False
     db_pool_size: int = 10

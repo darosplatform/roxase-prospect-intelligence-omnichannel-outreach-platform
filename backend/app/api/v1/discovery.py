@@ -154,6 +154,24 @@ async def get_discovery_source(
     return await _get_source(db, source_id, user.tenant_id)
 
 
+@router.post("/discovery/sources/{source_id}/fetch", response_model=DiscoverySourceRead)
+async def fetch_discovery_source(
+    source_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("owner", "admin", "manager")),
+) -> DiscoverySource:
+    """Run the secure fetcher (C2) against this source's URL.
+
+    Every candidate address is validated against SSRF safety rules before any
+    byte is requested; on success a RawDocument is stored, on any safety or
+    network failure the source is marked rejected/failed with the reason.
+    No Evidence, Signal or Lead is created here.
+    """
+    source = await _get_source(db, source_id, user.tenant_id)
+    source, _doc = await svc.fetch_source(db, user.tenant_id, source)
+    return source
+
+
 @router.post("/discovery/raw", response_model=RawDocumentRead, status_code=201)
 async def store_raw_document(
     payload: RawDocumentCreate,

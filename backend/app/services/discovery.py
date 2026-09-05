@@ -12,12 +12,15 @@ current state so concurrent callers cannot double-advance a job/source.
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.discovery_utils import content_hash, target_hash, url_hash
+from app.core.metrics import metrics
+from app.core.network_safety import SecureFetchError
 from app.models.discovery import (
     DISCOVERY_JOB_STATUSES,
     DISCOVERY_SOURCE_STATUSES,
@@ -25,6 +28,7 @@ from app.models.discovery import (
     DiscoverySource,
     RawDocument,
 )
+from app.services.secure_fetcher import FetchResult, secure_fetch
 
 VALID_JOB_TRANSITIONS = {
     "draft": ("queued", "cancelled"),
@@ -212,6 +216,76 @@ async def store_raw_document(
     await db.flush()
     await db.refresh(doc)
     return doc
+
+
+async def fetch_source(
+    db: AsyncSession,
+    tenant_id: uuid.UUID,
+    source: DiscoverySource,
+    *,
+    fetcher=None,
+) -> tuple[DiscoverySource, RawDocument | None]:
+    """Run the secure fetcher (C2) against a source and persist the outcome.
+
+    On success: stores a RawDocument with server-computed content_hash/size,
+    marks the source "fetched" with its own copy of the fetch metadata.
+    On any SecureFetchError (SSRF block, timeout, oversize, bad content-type,
+    DNS failure, ...): marks the source "rejected" (blocked before any real
+    exchange happened) or "failed" (the fetch was attempted and did not
+    complete), records the reason, and creates NO RawDocument. Either way,
+    this never creates Evidence, Signal, Lead or Score — that boundary is
+    downstream of C2.
+    """
+    fetch_fn = fetcher or secure_fetch
+    metrics.inc("discovery_fetch_total")
+    try:
+        result: FetchResult = await fetch_fn(source.url)
+    except SecureFetchError as exc:
+        if exc.code.startswith("blocked_") or exc.code in (
+            "malformed_url",
+            "blocked_scheme",
+            "blocked_port",
+            "blocked_content_type",
+        ):
+            metrics.inc("discovery_fetch_blocked_ssrf_total")
+            new_status = "rejected"
+        else:
+            metrics.inc("discovery_fetch_failed_total")
+            new_status = "failed"
+        source = await mark_source(
+            db,
+            source,
+            new_status,
+            validation_status=exc.code,
+            rejection_reason=exc.message,
+        )
+        await db.commit()
+        return source, None
+
+    decoded_body = result.body.decode("utf-8", errors="replace")
+    doc = await store_raw_document(
+        db,
+        tenant_id,
+        source_id=source.id,
+        job_id=source.job_id,
+        fetch_url=result.final_url,
+        content_type=result.content_type,
+        content_body=decoded_body,
+        http_status=result.status_code,
+    )
+    source.status = "fetched"
+    source.validation_status = "ok"
+    source.http_status = result.status_code
+    source.content_hash = doc.content_hash
+    source.raw_size = len(result.body)
+    source.fetched_at = datetime.now(UTC)
+    await db.flush()
+    await db.refresh(source)
+    await db.commit()
+    metrics.inc("discovery_fetch_succeeded_total")
+    metrics.inc("discovery_documents_total")
+    metrics.set("discovery_fetch_latency_ms_last", int(result.elapsed_seconds * 1000))
+    return source, doc
 
 
 def list_job_statuses() -> list[str]:

@@ -122,6 +122,21 @@ metrics.register("http_requests_client_errors_total", "counter", "HTTP 4xx respo
 metrics.register("http_requests_server_errors_total", "counter", "HTTP 5xx responses")
 metrics.register("http_in_flight", "gauge", "HTTP requests currently in flight")
 
+metrics.register("discovery_jobs_total", "counter", "Total discovery jobs created")
+metrics.register("discovery_jobs_failed_total", "counter", "Discovery jobs that ended failed")
+metrics.register("discovery_fetch_total", "counter", "Total secure-fetch attempts")
+metrics.register(
+    "discovery_fetch_blocked_ssrf_total", "counter", "Fetches blocked by SSRF safety checks"
+)
+metrics.register(
+    "discovery_fetch_failed_total", "counter", "Fetches that failed for a non-SSRF reason"
+)
+metrics.register(
+    "discovery_fetch_succeeded_total", "counter", "Fetches that produced a RawDocument"
+)
+metrics.register("discovery_fetch_latency_ms_last", "gauge", "Last secure-fetch latency (ms)")
+metrics.register("discovery_documents_total", "counter", "Total RawDocuments stored")
+
 
 def set_processing_latency(seconds: float) -> None:
     """Record last worker processing latency as a gauge (integer centiseconds)."""
