@@ -136,6 +136,13 @@ metrics.register(
 )
 metrics.register("discovery_fetch_latency_ms_last", "gauge", "Last secure-fetch latency (ms)")
 metrics.register("discovery_documents_total", "counter", "Total RawDocuments stored")
+metrics.register("discovery_worker_claimed_total", "counter", "Total discovery jobs claimed")
+metrics.register(
+    "discovery_worker_recovered_total", "counter", "Discovery jobs recovered from an expired lease"
+)
+metrics.register(
+    "discovery_worker_retried_total", "counter", "Discovery jobs scheduled for retry"
+)
 
 
 def set_processing_latency(seconds: float) -> None:

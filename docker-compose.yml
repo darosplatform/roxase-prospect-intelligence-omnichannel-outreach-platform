@@ -59,5 +59,22 @@ services:
       redis:
         condition: service_healthy
 
+  discovery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: ["python", "-m", "app.discovery_worker"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://roxase:roxase@postgres:5432/roxase
+      REDIS_URL: redis://redis:6379/0
+      DRY_RUN: "true"
+      APP_ENV: local
+      APP_LOG_LEVEL: INFO
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
 volumes:
   pgdata:
