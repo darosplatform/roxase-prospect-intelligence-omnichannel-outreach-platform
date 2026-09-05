@@ -105,15 +105,17 @@ The asynchronous variant of steps 3–5 runs unattended via `python -m app.disco
 
 Next.js App Router, client-rendered against the FastAPI Bearer-token API (no server-side session, so no RSC-side fetch with credentials — every data-fetching page is a client component). Pages: Dashboard, Discovery (jobs + per-source fetch/extract), Companies, Contacts, Leads (score breakdown, evidence-backed qualification), Evidence, Signals, Campaigns, Outreach, Audit. The frontend never enforces authorization — it hides UI affordances a role can't use, and every action still gets re-checked by the API.
 
-## 7. Known, currently-open item
+## 7. Known, currently-open items
 
-`POST /outreach` requires the caller to name the exact `lead_id` (fixed after a production-readiness audit found the endpoint previously guessed "the tenant's newest lead" — see git history / `tests/test_outreach_lead_targeting.py` for the regression suite that pins this down with three leads per tenant and cross-checks that scoring, policy evaluation, and audit all reference the named lead and only that lead).
+- `POST /outreach` requires the caller to name the exact `lead_id` (fixed after a production-readiness audit found the endpoint previously guessed "the tenant's newest lead" — see git history / `tests/test_outreach_lead_targeting.py` for the regression suite that pins this down with three leads per tenant and cross-checks that scoring, policy evaluation, and audit all reference the named lead and only that lead).
+- The frontend has no UI to create an `OutreachRequest` — the Outreach page can dispatch/cancel existing requests but the send-creation workflow described in §5 step 7 is currently only reachable via the API directly (`/docs` or a script). A production-readiness audit surfaced this; building the missing screen is deliberately not yet scheduled (see project roadmap).
 
 ## 8. What's deliberately out of scope for v1
 
 - No ML model for extraction or scoring — both are deterministic, versioned, and fully explainable by design (see `docs/archive/INITIAL_ARCHITECTURE.md` for the abandoned "AI Analysis" stage).
 - No queue broker — two polling workers sharing Postgres cover the actual throughput needs.
-- Real email/WhatsApp/Telegram/Meta providers are not wired: the provider abstraction exists (`app/services/providers.py`), `MockEmailProvider` backs every test and dry-run, but activating a real channel needs external accounts/credentials/app review that this repository cannot supply on its own.
+- WhatsApp/Telegram/Meta providers are not wired: `NoopProvider` backs those channels (`app/services/providers.py`) until each gets its own external account/credentials/sandbox/app review, one channel at a time.
+- Email has a real adapter (`SmtpEmailProvider`, generic SMTP — works with any provider: a self-hosted server, Gmail, SES, SendGrid, Mailgun, Postmark...) but it is only *active* when `smtp_host` is configured; local/dev/test and any deployment that leaves it unset keep using `MockEmailProvider`, and `DRY_RUN`/the `outreach_enabled` kill switch still gate every send regardless. `validate_production()` refuses to boot in production with `dry_run=false` and no `smtp_host` set, specifically so a misconfigured deployment can't silently fall back to a fabricated "sent" result.
 
 ## 9. Testing & CI
 

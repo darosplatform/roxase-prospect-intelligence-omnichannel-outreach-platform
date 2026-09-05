@@ -49,6 +49,19 @@ class Settings(BaseSettings):
     # allowlist instead; enforced by validate_production below.
     cors_allowed_origins: str = "*"
 
+    # Real email provider (SMTP). If smtp_host is unset, the registry falls
+    # back to MockEmailProvider — nothing changes for local/dev/test/CI.
+    # DRY_RUN and the outreach_enabled kill switch still gate every send
+    # regardless of whether a real provider is configured.
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    smtp_from_email: str | None = None
+    smtp_from_name: str | None = None
+    smtp_use_tls: bool = True
+    smtp_timeout_seconds: int = 10
+
     # Observability / hardening.
     log_json: bool = False
     db_pool_size: int = 10
@@ -94,6 +107,16 @@ def validate_production(settings: "Settings") -> None:
         problems.append("rate_limit_enabled must be True in production")
     if settings.cors_allowed_origins.strip() == "*":
         problems.append("cors_allowed_origins must be an explicit allowlist, not '*'")
+    if not settings.dry_run and not settings.smtp_host:
+        # Disabling dry_run without a real provider configured doesn't fail
+        # loudly at send time -- the registry silently falls back to
+        # MockEmailProvider, which reports every send as a fabricated
+        # success. That's exactly the "conclusion without evidence" failure
+        # mode this system exists to prevent, so it's refused at boot.
+        problems.append(
+            "dry_run is False but smtp_host is unset — email would silently "
+            "use MockEmailProvider instead of really sending"
+        )
     if problems:
         raise RuntimeError("Insecure production configuration: " + "; ".join(problems))
 

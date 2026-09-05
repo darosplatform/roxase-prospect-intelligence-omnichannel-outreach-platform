@@ -238,7 +238,7 @@ async def process_request(db: AsyncSession, req: OutreachRequest) -> str:
         campaign_id=req.campaign_id,
         metadata={"idempotency_key": req.idempotency_key},
     )
-    result = provider.send(message)
+    result = await provider.send(message)
 
     if result.ok:
         req.status = "sent"
