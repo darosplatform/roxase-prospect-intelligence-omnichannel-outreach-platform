@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.crud_helpers import apply_sort, paginate, prepare_search
 from app.api.deps import get_current_active_user
+from app.api.validators import assert_company_in_tenant
 from app.db.session import get_db
 from app.models.contact import Contact
 from app.models.user import User
@@ -68,6 +69,7 @@ async def create_contact(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_active_user),
 ) -> Contact:
+    await assert_company_in_tenant(db, payload.company_id, user.tenant_id)
     contact = Contact(**payload.model_dump(), tenant_id=user.tenant_id)
     db.add(contact)
     await db.flush()
