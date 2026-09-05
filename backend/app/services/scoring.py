@@ -301,7 +301,7 @@ def compute_score(
     fit_score = _fit_score(active_signals)
     data_confidence = _data_confidence_score(active_signals, evidence_lookup)
 
-    newest = min(active_signals, key=lambda s: s.detected_at)
+    newest = max(active_signals, key=lambda s: s.detected_at)
     freshness = _freshness_score(_age_days(now, newest.detected_at))
 
     lead_score = round(

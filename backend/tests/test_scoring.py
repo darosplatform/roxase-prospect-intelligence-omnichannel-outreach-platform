@@ -137,6 +137,27 @@ async def test_freshness_penalizes_old_data():
 
 
 @pytest.mark.asyncio
+async def test_freshness_uses_the_newest_signal_not_the_oldest():
+    now = datetime(2026, 9, 3, tzinfo=UTC)
+    # One stale signal and one very recent signal on the same lead: freshness
+    # must reflect the recent one, not silently fall back to the stale one.
+    mixed = compute_score(
+        [
+            _signal("expansion", detected_at=datetime(2020, 1, 1, tzinfo=UTC)),
+            _signal("hiring", detected_at=datetime(2026, 9, 2, tzinfo=UTC)),
+        ],
+        [_evidence(uuid.uuid4())],
+        now=now,
+    )
+    only_stale = compute_score(
+        [_signal("expansion", detected_at=datetime(2020, 1, 1, tzinfo=UTC))],
+        [_evidence(uuid.uuid4())],
+        now=now,
+    )
+    assert mixed.freshness > only_stale.freshness
+
+
+@pytest.mark.asyncio
 async def test_fingerprint_is_stable():
     a = fingerprint_of({"type": "x", "value": 1})
     assert a == fingerprint_of({"value": 1, "type": "x"})
