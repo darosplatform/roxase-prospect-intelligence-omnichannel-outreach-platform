@@ -42,8 +42,11 @@ async def _setup(client: AsyncClient, suffix: str, dry_run: bool = True):
     return headers, lead_id, contact_id, campaign_id, template_id
 
 
-async def _create_req(client, headers, campaign_id, contact_id, template_id, channel="email"):
+async def _create_req(
+    client, headers, campaign_id, contact_id, template_id, lead_id, channel="email"
+):
     body = {
+        "lead_id": lead_id,
         "campaign_id": campaign_id,
         "contact_id": contact_id,
         "channel": channel,
@@ -55,7 +58,7 @@ async def _create_req(client, headers, campaign_id, contact_id, template_id, cha
 @pytest.mark.asyncio
 async def test_outreach_dry_run_creates_and_simulates(client: AsyncClient, db_session):
     headers, lead_id, contact_id, campaign_id, template_id = await _setup(client, "dry")
-    resp = await _create_req(client, headers, campaign_id, contact_id, template_id)
+    resp = await _create_req(client, headers, campaign_id, contact_id, template_id, lead_id)
     assert resp.status_code == 201, resp.text
     body = resp.json()
     assert body["status"] == "approved"
@@ -87,7 +90,7 @@ async def test_outreach_denied_by_policy_never_queued(client: AsyncClient):
         headers=headers,
     )
     assert dnc.status_code == 201, dnc.text
-    resp = await _create_req(client, headers, campaign_id, contact_id, template_id)
+    resp = await _create_req(client, headers, campaign_id, contact_id, template_id, lead_id)
     assert resp.status_code == 201, resp.text
     assert resp.json()["status"] == "denied"
     dispatched = await client.post(
@@ -100,8 +103,8 @@ async def test_outreach_denied_by_policy_never_queued(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_outreach_idempotent_single_request(client: AsyncClient):
     headers, lead_id, contact_id, campaign_id, template_id = await _setup(client, "idem")
-    first = await _create_req(client, headers, campaign_id, contact_id, template_id)
-    second = await _create_req(client, headers, campaign_id, contact_id, template_id)
+    first = await _create_req(client, headers, campaign_id, contact_id, template_id, lead_id)
+    second = await _create_req(client, headers, campaign_id, contact_id, template_id, lead_id)
     assert first.status_code == 201, first.text
     assert second.status_code == 201, second.text
     assert first.json()["id"] == second.json()["id"]
@@ -115,7 +118,7 @@ async def test_outreach_idempotent_single_request(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_outreach_review_path_leaves_pending(client: AsyncClient):
     headers, lead_id, contact_id, campaign_id, template_id = await _setup(client, "rev")
-    resp = await _create_req(client, headers, campaign_id, contact_id, template_id)
+    resp = await _create_req(client, headers, campaign_id, contact_id, template_id, lead_id)
     assert resp.status_code == 201, resp.text
     # default dry-run allow with consent present yields approved
     assert resp.json()["status"] == "approved"
@@ -127,11 +130,11 @@ async def test_outreach_rbac_operator_and_viewer(client: AsyncClient):
 
     headers, lead_id, contact_id, campaign_id, template_id = await _setup(client, "op")
     operator = await create_user_with_role(client, headers, "operator@example.com", "operator")
-    resp = await _create_req(client, operator, campaign_id, contact_id, template_id)
+    resp = await _create_req(client, operator, campaign_id, contact_id, template_id, lead_id)
     assert resp.status_code in (200, 201, 403), resp.text
 
     viewer = await create_user_with_role(client, headers, "viewer@example.com", "viewer")
     resp_read = await client.get("/api/v1/outreach", headers=viewer)
     assert resp_read.status_code == 200, resp_read.text
-    resp_create = await _create_req(client, viewer, campaign_id, contact_id, template_id)
+    resp_create = await _create_req(client, viewer, campaign_id, contact_id, template_id, lead_id)
     assert resp_create.status_code == 403

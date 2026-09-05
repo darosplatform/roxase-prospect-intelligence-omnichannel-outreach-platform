@@ -113,7 +113,9 @@ async def test_outreach_cross_tenant_lifecycle_actions_return_404(client: AsyncC
             headers=a_headers,
         )
     ).json()
-    await client.post("/api/v1/leads", json={"company_id": company_id}, headers=a_headers)
+    lead = (
+        await client.post("/api/v1/leads", json={"company_id": company_id}, headers=a_headers)
+    ).json()
     template = (
         await client.post(
             "/api/v1/templates",
@@ -124,7 +126,12 @@ async def test_outreach_cross_tenant_lifecycle_actions_return_404(client: AsyncC
     outreach = (
         await client.post(
             "/api/v1/outreach",
-            json={"contact_id": contact["id"], "channel": "email", "template_id": template["id"]},
+            json={
+                "lead_id": lead["id"],
+                "contact_id": contact["id"],
+                "channel": "email",
+                "template_id": template["id"],
+            },
             headers=a_headers,
         )
     ).json()

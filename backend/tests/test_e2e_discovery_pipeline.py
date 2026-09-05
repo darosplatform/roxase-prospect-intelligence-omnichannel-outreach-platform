@@ -197,6 +197,7 @@ async def test_e2e_discovery_to_outreach_dry_run_with_full_traceability(
     outreach_resp = await client.post(
         "/api/v1/outreach",
         json={
+            "lead_id": lead_id,
             "campaign_id": campaign_id,
             "contact_id": contact_id,
             "channel": "email",

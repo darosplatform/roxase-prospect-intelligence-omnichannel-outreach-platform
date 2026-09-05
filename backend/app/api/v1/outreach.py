@@ -10,6 +10,7 @@ from app.api.v1.policies import _build_policy_input
 from app.api.validators import (
     assert_campaign_in_tenant,
     assert_contact_in_tenant,
+    assert_lead_in_tenant,
     assert_template_in_tenant,
 )
 from app.core.audit import record_audit
@@ -93,23 +94,38 @@ async def create_outreach_request(
     user: User = Depends(require_role("owner", "admin", "manager", "operator")),
     _ratelimit=Depends(default_limiter),
 ) -> OutreachRequest:
-    lead_result = await db.execute(
-        select(Lead)
-        .where(Lead.company_id.isnot(None), Lead.tenant_id == user.tenant_id)
-        .order_by(Lead.created_at.desc())
-        .limit(1)
-    )
-    lead = lead_result.scalar_one_or_none()
-    if lead is None:
-        raise HTTPException(status_code=422, detail="No lead available for outreach")
+    # The caller names the exact Lead this request is for — never guessed
+    # from "whichever lead happens to be newest in the tenant" (that was
+    # the bug: with more than one lead per tenant, an outreach request for
+    # Contact A could silently get scored/policy-evaluated against Lead B).
+    await assert_lead_in_tenant(db, payload.lead_id, user.tenant_id)
+    lead = await _get_entity(db, Lead, payload.lead_id)
 
     contact = None
     if payload.contact_id:
         await assert_contact_in_tenant(db, payload.contact_id, user.tenant_id)
         contact = await _get_entity(db, Contact, payload.contact_id)
+        # Coherence: a contact attached to a *different* company than the
+        # lead's is never the right target, even though both belong to
+        # this tenant.
+        if lead.company_id and contact.company_id and contact.company_id != lead.company_id:
+            raise HTTPException(
+                status_code=422,
+                detail="contact does not belong to the same company as the lead",
+            )
+        # Coherence: if the lead already names its own contact, the caller
+        # cannot silently redirect the request to a different one.
+        if lead.contact_id and lead.contact_id != contact.id:
+            raise HTTPException(
+                status_code=422,
+                detail="contact does not match the lead's own contact",
+            )
 
     campaign = None
     if payload.campaign_id:
+        # Campaign is tenant-scoped only (no company/lead reference exists
+        # on the model to cross-check against) — same-tenant is the full
+        # coherence guarantee available here.
         await assert_campaign_in_tenant(db, payload.campaign_id, user.tenant_id)
         campaign = await _get_entity(db, Campaign, payload.campaign_id)
 

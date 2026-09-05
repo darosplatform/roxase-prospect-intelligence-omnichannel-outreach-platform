@@ -163,6 +163,7 @@ async def test_e2e_full_pipeline_allow_and_dry_run_send(client: AsyncClient):
     or_create = await client.post(
         "/api/v1/outreach",
         json={
+            "lead_id": ctx["lead_id"],
             "campaign_id": ctx["campaign_id"],
             "contact_id": ctx["contact_id"],
             "channel": "email",
@@ -223,6 +224,7 @@ async def test_e2e_dnc_denies(client: AsyncClient):
     or_create = await client.post(
         "/api/v1/outreach",
         json={
+            "lead_id": ctx["lead_id"],
             "campaign_id": ctx["campaign_id"],
             "contact_id": ctx["contact_id"],
             "channel": "email",
@@ -311,6 +313,7 @@ async def test_e2e_frequency_exceeded_denies(client: AsyncClient):
         r = await client.post(
             "/api/v1/outreach",
             json={
+                "lead_id": ctx["lead_id"],
                 "campaign_id": ctx["campaign_id"],
                 "contact_id": ctx["contact_id"],
                 "channel": "email",
@@ -334,6 +337,7 @@ async def test_e2e_frequency_exceeded_denies(client: AsyncClient):
     third = await client.post(
         "/api/v1/outreach",
         json={
+            "lead_id": ctx["lead_id"],
             "campaign_id": ctx["campaign_id"],
             "contact_id": ctx["contact_id"],
             "channel": "email",
@@ -350,6 +354,7 @@ async def test_e2e_frequency_exceeded_denies(client: AsyncClient):
 async def test_e2e_duplicate_request_is_idempotent(client: AsyncClient):
     ctx = await _build_pipeline(client, "dupe")
     payload = {
+        "lead_id": ctx["lead_id"],
         "campaign_id": ctx["campaign_id"],
         "contact_id": ctx["contact_id"],
         "channel": "email",

@@ -92,7 +92,9 @@ async def test_outreach_policy_denied_total_increments_on_dnc(client: AsyncClien
             "/api/v1/contacts", json={"company_id": company_id, "email": "a@b.com"}, headers=headers
         )
     ).json()
-    await client.post("/api/v1/leads", json={"company_id": company_id}, headers=headers)
+    lead = (
+        await client.post("/api/v1/leads", json={"company_id": company_id}, headers=headers)
+    ).json()
     await client.post(
         "/api/v1/do-not-contact",
         json={"contact_id": contact["id"], "channel": "email", "reason": "opt out"},
@@ -109,7 +111,12 @@ async def test_outreach_policy_denied_total_increments_on_dnc(client: AsyncClien
     before = metrics.count("outreach_policy_denied_total")
     resp = await client.post(
         "/api/v1/outreach",
-        json={"contact_id": contact["id"], "channel": "email", "template_id": template["id"]},
+        json={
+            "lead_id": lead["id"],
+            "contact_id": contact["id"],
+            "channel": "email",
+            "template_id": template["id"],
+        },
         headers=headers,
     )
     assert resp.status_code == 201
@@ -160,7 +167,12 @@ async def test_outreach_queued_total_increments_on_dispatch(client: AsyncClient)
     outreach = (
         await client.post(
             "/api/v1/outreach",
-            json={"contact_id": contact["id"], "channel": "email", "template_id": template["id"]},
+            json={
+                "lead_id": lead_id,
+                "contact_id": contact["id"],
+                "channel": "email",
+                "template_id": template["id"],
+            },
             headers=headers,
         )
     ).json()

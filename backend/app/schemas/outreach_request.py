@@ -11,6 +11,7 @@ _STATUS_PATTERN = "^(?:" + "|".join(OUTREACH_STATUSES) + ")$"
 
 
 class OutreachRequestCreate(BaseModel):
+    lead_id: uuid.UUID
     campaign_id: uuid.UUID | None = None
     contact_id: uuid.UUID | None = None
     channel: str = Field(..., pattern=_CHANNEL_PATTERN)
